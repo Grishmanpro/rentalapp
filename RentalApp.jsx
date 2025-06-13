@@ -231,20 +231,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     return () => clearInterval(id);
   }, [wallet.connected]);
 
-  const resumeRentalAndRestart = async () => {
-    try {
-      const tx = await window.contract.resumeRental();
-      setRental(prev => ({ ...prev, isPaused: false }));
-      setContractStatus("Active");
-      await tx.wait();
-      updateStatus("▶ Аренда возобновлена.");
-    } catch (e) {
-      console.error("Ошибка возобновления:", e);
-      updateStatus("❌ Ошибка возобновления аренды.");
-    }
-  };
-  
-  
 
   // Обработчик паузы с интеграцией контракта
   const handlePause = async () => {
@@ -618,14 +604,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                 {rental.isPaused ? "▶ Продолжить" : "⏸ Пауза"}
                 </button>
 
-                {rental.isPaused && !forcedPauseReason && (
-                <button
-                  onClick={resumeRentalAndRestart}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm shadow"
-                >
-                  ▶ Продолжить
-                </button>
-              )}
 
 
                   {forcedPauseReason === "zone" && (
@@ -644,14 +622,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                     </button>
                   )}
 
-                    {rental.isPaused && !forcedPauseReason && (
-                      <button
-                        onClick={handlePause}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm shadow"
-                      >
-                        ▶ Продолжить
-                      </button>
-                    )}
 
                     <button
                       onClick={returnEquipment}
