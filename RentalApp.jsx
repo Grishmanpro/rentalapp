@@ -239,16 +239,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   const handlePause = async () => {
     try {
       if (rental.isPaused) {
+        // Останавливаем таймер сразу при возобновлении
+        setRental(prev => ({ ...prev, isPaused: false }));
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
         await tx.wait();
         const status = await window.contract.getStatus();
-        setRental(prev => ({ ...prev, isPaused: false }));
         setContractStatus(status);
       } else {
+        // Останавливаем таймер сразу при паузе
+        setRental(prev => ({ ...prev, isPaused: true }));
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
         await tx.wait();
         const status = await window.contract.getStatus();
-        setRental(prev => ({ ...prev, isPaused: true }));
         setContractStatus(status);
       }
 
@@ -261,6 +263,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
     } catch (error) {
       console.error("Ошибка паузы:", error);
+      // Возвращаем предыдущее состояние если транзакция не прошла
+      setRental(prev => ({ ...prev, isPaused: !prev.isPaused }));
       updateStatus(`❌ ${error.reason?.split(":")[1] || "Ошибка транзакции"}`);
     }
   };
