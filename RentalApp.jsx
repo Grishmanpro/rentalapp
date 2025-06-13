@@ -247,6 +247,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             .resumeRental()
             .catch(e => console.error("Ошибка при авто-возобновлении:", e));
           setForcedPauseReason(null);
+          simulationStepRef.current = 0;
           setRental(prevRental => ({ ...prevRental, isPaused: false }));
           updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
         }
@@ -286,6 +287,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         await tx.wait();
         const status = await window.contract.getStatus();
         setContractStatus(status);
+        simulationStepRef.current = 0;
       } else {
         // Останавливаем таймер сразу при паузе
         setRental(prev => ({ ...prev, isPaused: true }));
