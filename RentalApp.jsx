@@ -47,6 +47,8 @@ export default function RentalApp() {
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
 
+  const [contractStatus, setContractStatus] = useState("");
+
 
   const [calculation, setCalculation] = useState({
     estimatedCostEth: null,
@@ -97,6 +99,19 @@ export default function RentalApp() {
       
       const contract = new Contract(CONTRACT_ADDRESS, ABI, signer);
       window.contract = contract;
+
+      const currentStatus = await contract.getStatus();
+      setContractStatus(currentStatus);
+
+      // Подписываемся на события паузы/возобновления
+      contract.on("RentalPaused", () => {
+        setRental(prev => ({ ...prev, isPaused: true }));
+        setContractStatus("Paused");
+      });
+      contract.on("RentalResumed", () => {
+        setRental(prev => ({ ...prev, isPaused: false }));
+        setContractStatus("Active");
+      });
 
       const equipmentData = await Promise.all([
         contract.equipmentName(),
@@ -207,11 +222,22 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     return () => clearInterval(interval);
   }, [rental.isActive, rental.isPaused]);
 
+  // Периодически обновляем статус контракта
+  useEffect(() => {
+    if (!wallet.connected) return;
+    const id = setInterval(() => {
+      window.contract.getStatus().then(setContractStatus).catch(() => {});
+    }, 3000);
+    return () => clearInterval(id);
+  }, [wallet.connected]);
+
   const resumeRentalAndRestart = async () => {
     try {
-      await window.contract.resumeRental();
-      updateStatus("▶ Аренда возобновлена.");
+      const tx = await window.contract.resumeRental();
       setRental(prev => ({ ...prev, isPaused: false }));
+      setContractStatus("Active");
+      await tx.wait();
+      updateStatus("▶ Аренда возобновлена.");
     } catch (e) {
       console.error("Ошибка возобновления:", e);
       updateStatus("❌ Ошибка возобновления аренды.");
@@ -224,12 +250,17 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   const handlePause = async () => {
     try {
       if (rental.isPaused) {
-        await window.contract.resumeRental({ gasLimit: 250000 });
+        const tx = await window.contract.resumeRental({ gasLimit: 250000 });
+        setRental(prev => ({ ...prev, isPaused: false }));
+        setContractStatus("Active");
+        await tx.wait();
       } else {
-        await window.contract.pauseRental({ gasLimit: 250000 });
+        const tx = await window.contract.pauseRental({ gasLimit: 250000 });
+        setRental(prev => ({ ...prev, isPaused: true }));
+        setContractStatus("Paused");
+        await tx.wait();
       }
-      
-      // Принудительное обновление данных
+
       const rentalData = await window.contract.activeRental();
       setRental(prev => ({
         ...prev,
@@ -281,7 +312,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       );
   
       await tx.wait();
-  
+
       setRental(prev => ({
         ...prev,
         startTime: Math.floor(Date.now() / 1000),
@@ -291,6 +322,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         totalPausedDuration: 0,
         status: "✅ Аренда началась"
       }));
+      setContractStatus("Active");
   
     } catch (error) {
       console.error("Ошибка аренды:", error);
@@ -363,6 +395,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         timer: 0,
         status: `🔁 Аренда завершена. Возвращено: ${refundAmount} ETH`
       }));
+      setContractStatus("Available");
 
       // Обновляем баланс кошелька
       const newBalance = await provider.getBalance(wallet.address);
@@ -378,6 +411,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   const checkStatus = async () => {
     try {
       const status = await window.contract.getStatus();
+      setContractStatus(status);
       updateStatus(`📋 Статус: ${status}`);
     } catch (error) {
       console.error("Ошибка проверки статуса:", error);
@@ -414,6 +448,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         {/* Шапка */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Аренда спецтехники</h1>
+          {contractStatus && (
+            <span className="text-sm text-gray-600">Статус: {contractStatus}</span>
+          )}
           
           {!wallet.connected ? (
             <button
@@ -477,12 +514,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                   Радиус: {geoZones.restricted.radius} м
                 </li>
 
-              <strong>Статус аренды:</strong>{" "}
-              {equipment.isAvailable ? (
-                <span className="text-green-600 font-medium">Готов к аренде</span>
-              ) : (
-                <span className="text-red-600 font-medium">Недоступно</span>
-              )}
+              <strong>Статус контракта:</strong>{" "}
+              <span className="font-medium">{contractStatus || "—"}</span>
             </li>
           </ul>
         </div>
@@ -558,6 +591,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         {rental.startTime !== null && (
           <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl mt-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">⏱ Отслеживание аренды</h2>
+            <p className="text-sm text-gray-600">Статус: {contractStatus}</p>
             <div className="space-y-1">
               <p className="text-gray-700 font-medium">
                 Время аренды: {Math.min(rental.timer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
