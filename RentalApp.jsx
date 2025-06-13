@@ -192,6 +192,10 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       // Эмуляция координат и проверка зоны
       setCoordinates(prev => {
+        if (forcedPauseReason === "zone") {
+          // keep the last position and skip random movement
+          return prev;
+        }
         simulationStepRef.current += 1;
 
         let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * 0.0001).toFixed(6));
@@ -622,6 +626,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl mt-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">⏱ Отслеживание аренды</h2>
             <p className="text-sm text-gray-600">Статус: {contractStatus}</p>
+            {forcedPauseReason === "zone" && (
+              <div className="bg-red-100 border border-red-300 text-red-800 p-2 rounded text-sm">
+                Техника находится вне геозоны
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-gray-700 font-medium">
                 Время аренды: {Math.min(rental.timer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
