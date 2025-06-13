@@ -7,6 +7,8 @@ const ETH_TO_RUB_RATE = 270000;
 const GAS_BUFFER_ETH = 0.0003;
 const ETHERSCAN_BASE = "https://sepolia.etherscan.io/tx/";
 const provider = new BrowserProvider(window.ethereum);
+// Amplitude of random coordinate shift in degrees (~0.0005 deg ≈ 55 m)
+const COORDINATE_NOISE = 0.001;
 
 const formatCurrency = (value, isEth = false) => {
   if (isEth) {
@@ -198,8 +200,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         }
         simulationStepRef.current += 1;
 
-        let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * 0.0001).toFixed(6));
-        let newLng = parseFloat((prev.lng + (Math.random() - 0.5) * 0.0001).toFixed(6));
+        let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
+        let newLng = parseFloat((prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
 
         if (simulationStepRef.current === 5) {
           // выходим из рабочей зоны
