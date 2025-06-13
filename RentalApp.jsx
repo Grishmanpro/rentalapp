@@ -330,7 +330,29 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       const receipt = await tx.wait();
       
       // Получаем актуальные данные из контракта
-      const event = receipt.events?.find(e => e.event === "RentalEnded");
+      let event = receipt.events?.find(e => e.event === "RentalEnded");
+
+      // Fallback для сетей без receipt.events
+      if (!event) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = window.contract.interface.parseLog(log);
+            if (parsed.name === "RentalEnded") {
+              event = { args: parsed.args };
+              break;
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+      }
+
+      if (!event || !event.args) {
+        console.error("RentalEnded event not found", receipt);
+        updateStatus("❌ Событие RentalEnded не найдено");
+        return;
+      }
+
       const usedSeconds = event.args.usedSeconds.toString();
       const refundAmount = formatEther(event.args.refundAmount.toString());
 
