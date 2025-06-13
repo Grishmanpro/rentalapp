@@ -5,6 +5,7 @@ import ABI from "../abi/RentalContractABI.json";
 const CONTRACT_ADDRESS = "0x43182Ae66569CE85C9aB8Aa45b94A66743EcCa88";
 const ETH_TO_RUB_RATE = 270000;
 const GAS_BUFFER_ETH = 0.0003;
+const ETHERSCAN_BASE = "https://sepolia.etherscan.io/tx/";
 const provider = new BrowserProvider(window.ethereum);
 
 const formatCurrency = (value, isEth = false) => {
@@ -42,7 +43,9 @@ export default function RentalApp() {
     fixedDuration: null,
     isPaused: false,
     pausedTime: 0,
-    totalPausedDuration: 0
+    totalPausedDuration: 0,
+    startTxHash: null,
+    endTxHash: null
   });
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
@@ -298,7 +301,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         lonE6,
         { value: parseEther(totalCost.toString()) }
       );
-  
+
       await tx.wait();
 
       setRental(prev => ({
@@ -308,7 +311,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         isActive: true,
         isPaused: false,
         totalPausedDuration: 0,
-        status: "✅ Аренда началась"
+        status: "✅ Аренда началась",
+        startTxHash: tx.hash,
+        endTxHash: null
       }));
       setContractStatus("Active");
   
@@ -381,7 +386,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         isActive: false,
         startTime: null,
         timer: 0,
-        status: `🔁 Аренда завершена. Возвращено: ${refundAmount} ETH`
+        status: `🔁 Аренда завершена. Возвращено: ${refundAmount} ETH`,
+        endTxHash: tx.hash
       }));
       setContractStatus("Available");
 
@@ -637,6 +643,33 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
               <p><strong>Чек аренды:</strong></p>
               <p>⏱ Время: {Math.min(rental.timer, rental.fixedDuration)} сек</p>
               <p>💰 Сумма: {formatCurrency(currentCostEth)}</p>
+              {rental.endTxHash && (
+                <div className="pt-2">
+                  <p><strong>Отчёт:</strong></p>
+                  <p>
+                    Начало: {" "}
+                    <a
+                      href={`${ETHERSCAN_BASE}${rental.startTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      посмотреть
+                    </a>
+                  </p>
+                  <p>
+                    Завершение: {" "}
+                    <a
+                      href={`${ETHERSCAN_BASE}${rental.endTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      посмотреть
+                    </a>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
