@@ -180,9 +180,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     if (!rental.isActive) return;
 
     const interval = setInterval(() => {
-      // Увеличиваем таймер только если аренда не на паузе
+      // Увеличиваем таймер только когда контракт активен и аренда не на паузе
       setRental(prev =>
-        prev.isPaused ? prev : { ...prev, timer: prev.timer + 1 }
+        prev.isPaused || contractStatus !== "Active"
+          ? prev
+          : { ...prev, timer: prev.timer + 1 }
       );
 
       // Эмуляция координат и проверка зоны
@@ -223,7 +225,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [rental.isActive, rental.isPaused]);
+  }, [rental.isActive, rental.isPaused, contractStatus]);
 
   // Периодически обновляем статус контракта
   useEffect(() => {
