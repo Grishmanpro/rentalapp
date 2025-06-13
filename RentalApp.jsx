@@ -185,7 +185,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
   // Отсчёт времени и геоконтроль
   useEffect(() => {
-    if (!rental.isActive) return;
+    if (!rental.isActive || rental.isPaused) return;
 
     const interval = setInterval(() => {
       // Увеличиваем таймер только когда контракт активен и аренда не на паузе
@@ -197,8 +197,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       // Эмуляция координат и проверка зоны
       setCoordinates(prev => {
-        if (forcedPauseReason === "zone") {
-          // keep the last position and skip random movement
+        if (rental.isPaused || forcedPauseReason === "zone") {
+          // keep the last position and skip random movement during any pause
           return prev;
         }
         simulationStepRef.current += 1;
