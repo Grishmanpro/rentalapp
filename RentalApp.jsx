@@ -78,10 +78,13 @@ export default function RentalApp() {
       radius: 100
     }
   });
+
+  const [simulateViolation, setSimulateViolation] = useState(false);
   
-  const generateRestrictedZone = (allowedZone, offsetMeters = 100) => {
-    const offsetDegrees = offsetMeters / 111000; // ≈ 150м в градусах
-  
+  const generateRestrictedZone = (allowedZone) => {
+    const offsetMeters = allowedZone.radius + 50; // немного дальше рабочей зоны
+    const offsetDegrees = offsetMeters / 111000;
+
     return {
       lat: allowedZone.lat + offsetDegrees,
       lng: allowedZone.lng + offsetDegrees,
@@ -203,11 +206,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
         let newLng = parseFloat((prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
 
-        if (simulationStepRef.current === 5) {
+        if (simulateViolation && simulationStepRef.current === 5) {
           // выходим из рабочей зоны
           newLat = geoZones.restricted.lat;
           newLng = geoZones.restricted.lng;
-        } else if (simulationStepRef.current === 10) {
+        } else if (simulateViolation && simulationStepRef.current === 10) {
           // возвращаемся в рабочую зону
           newLat = geoZones.allowed.lat;
           newLng = geoZones.allowed.lng;
@@ -261,7 +264,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [rental.isActive, rental.isPaused, contractStatus]);
+  }, [rental.isActive, rental.isPaused, contractStatus, simulateViolation]);
 
   // Периодически обновляем статус контракта
   useEffect(() => {
@@ -345,6 +348,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       );
 
       await tx.wait();
+      simulationStepRef.current = 0;
 
       setRental(prev => ({
         ...prev,
@@ -560,14 +564,24 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl space-y-6">
           <div className="grid gap-4">
             <label className="text-sm">Длительность аренды (в секундах)</label>
-            <input
-              type="number"
-              value={rental.duration}
-              onChange={(e) => setRental(prev => ({...prev, duration: e.target.value}))}
-              placeholder="например, 3600"
-              className="w-full border border-gray-300 px-4 py-2 rounded-md shadow-sm text-sm"
-            />
+          <input
+            type="number"
+            value={rental.duration}
+            onChange={(e) => setRental(prev => ({...prev, duration: e.target.value}))}
+            placeholder="например, 3600"
+            className="w-full border border-gray-300 px-4 py-2 rounded-md shadow-sm text-sm"
+          />
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={simulateViolation}
+              onChange={(e) => setSimulateViolation(e.target.checked)}
+              className="form-checkbox h-4 w-4 text-blue-600"
+            />
+            <span>Эмулировать нарушение геозоны</span>
+          </label>
 
           <div className="text-sm text-gray-600">
             💰 Баланс: {formatCurrency(wallet.balance, true)} ({formatCurrency(wallet.balance)})
