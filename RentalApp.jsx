@@ -47,8 +47,6 @@ export default function RentalApp() {
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
 
-  const [shouldResume, setShouldResume] = useState(false);
-
 
   const [calculation, setCalculation] = useState({
     estimatedCostEth: null,
@@ -159,103 +157,61 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     }
   };
 
-  // Таймер с учётом пауз
+  // Отсчёт времени и геоконтроль
   useEffect(() => {
-    const restricted = generateRestrictedZone(geoZones.allowed);
-    setGeoZones(prev => ({ ...prev, restricted }));
+    if (!rental.isActive) return;
 
-    let interval;
-  
-    const updateTimer = async () => {
-      try {
-        // Получаем актуальные данные из контракта
-        const rentalData = await window.contract.activeRental();
-        const currentTime = Math.floor(Date.now() / 1000);
-    
-        // Рассчитываем прошедшее время с учётом пауз
-        const totalPaused = Number(rentalData.pausedDuration);
-        const effectiveStartTime = Number(rentalData.startTime) + totalPaused;
-        const elapsed = currentTime - effectiveStartTime;
-        const correctedElapsed = Math.min(elapsed, rental.fixedDuration);
-    
-        setRental(prev => ({
-          ...prev,
-          timer: correctedElapsed,
-          isPaused: rentalData.isPaused,
-          totalPausedDuration: totalPaused
-        }));
-    
-        // Эмуляция координат
-        setCoordinates(prev => {
-          const newLat = prev.lat + (Math.random() - 0.5) * 0.0001;
-          const newLng = prev.lng + (Math.random() - 0.5) * 0.0001;
-          return {
-            lat: parseFloat(newLat.toFixed(6)),
-            lng: parseFloat(newLng.toFixed(6))
-          };
-        });
-    
-        // Проверка запретной зоны
-        const latE6 = Math.floor(coordinates.lat * 1e6);
-        const lonE6 = Math.floor(coordinates.lng * 1e6);
-        const restrictedLatE6 = Math.floor(geoZones.restricted.lat * 1e6);
-        const restrictedLonE6 = Math.floor(geoZones.restricted.lng * 1e6);
-    
-        const metersLat = Math.abs(latE6 - restrictedLatE6) * 111000 / 1e6;
-        const metersLon = Math.abs(lonE6 - restrictedLonE6) * 111000 / 1e6;
+    const interval = setInterval(() => {
+      // Увеличиваем таймер только если аренда не на паузе
+      setRental(prev =>
+        prev.isPaused ? prev : { ...prev, timer: prev.timer + 1 }
+      );
+
+      // Эмуляция координат и проверка зоны
+      setCoordinates(prev => {
+        const newLat = parseFloat((prev.lat + (Math.random() - 0.5) * 0.0001).toFixed(6));
+        const newLng = parseFloat((prev.lng + (Math.random() - 0.5) * 0.0001).toFixed(6));
+
+        const latE6 = Math.floor(newLat * 1e6);
+        const lonE6 = Math.floor(newLng * 1e6);
+        const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
+        const centerLonE6 = Math.floor(geoZones.allowed.lng * 1e6);
+
+        const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
+        const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
         const dist2 = metersLat ** 2 + metersLon ** 2;
-    
-        console.log("🔍 Проверка запретной зоны:", dist2, "<=", geoZones.restricted.radius ** 2);
-    
-        // Проверка запретной зоны (внутри updateTimer, после setCoordinates)
+
         if (
-          dist2 <= geoZones.restricted.radius ** 2 &&
-          rental.isActive &&
+          dist2 > geoZones.allowed.radius ** 2 &&
           !rental.isPaused &&
           !forcedPauseReason
         ) {
-          clearInterval(interval); // Останавливаем интервал
+          window.contract.pauseRental().catch(e => console.error("Ошибка при авто-паузе:", e));
           setForcedPauseReason("zone");
-
-          try {
-            await window.contract.pauseRental();
-            updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
-            setRental(prev => ({ ...prev, isPaused: true }));
-          } catch (e) {
-            console.error("Ошибка при авто-паузе:", e);
-          }
+          setRental(prevRental => ({ ...prevRental, isPaused: true }));
+          updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
         }
 
-    
-        // Автоматическое завершение
-        if (correctedElapsed >= rental.fixedDuration) {
-          setRental(prev => ({ ...prev, isActive: false }));
+        return { lat: newLat, lng: newLng };
+      });
+
+      // Автозавершение аренды
+      setRental(prev => {
+        if (prev.fixedDuration && prev.timer >= prev.fixedDuration) {
+          return { ...prev, isActive: false };
         }
-    
-      } catch (error) {
-        console.error("Ошибка обновления таймера:", error);
-      }
-    };
-    
-  
-    if (rental.isActive) {
-      interval = setInterval(updateTimer, 1000);
-      updateTimer(); // Немедленный вызов при монтировании
-    }
-  
-    return () => {
-      clearInterval(interval);
-      setShouldResume(false);
-    };
-    
-  }, [rental.isActive, shouldResume]);
+        return prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [rental.isActive, rental.isPaused]);
 
   const resumeRentalAndRestart = async () => {
     try {
       await window.contract.resumeRental();
       updateStatus("▶ Аренда возобновлена.");
       setRental(prev => ({ ...prev, isPaused: false }));
-      setShouldResume(true); // триггер перезапуска useEffect
     } catch (e) {
       console.error("Ошибка возобновления:", e);
       updateStatus("❌ Ошибка возобновления аренды.");
