@@ -248,7 +248,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       setShouldResume(false);
     };
     
-  }, [rental.isActive]);
+  }, [rental.isActive, shouldResume]);
 
   const resumeRentalAndRestart = async () => {
     try {
