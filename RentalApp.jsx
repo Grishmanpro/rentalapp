@@ -203,13 +203,27 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
         if (
           dist2 > geoZones.allowed.radius ** 2 &&
-          !rental.isPaused &&
+          contractStatus === "Active" &&
           !forcedPauseReason
         ) {
-          window.contract.pauseRental().catch(e => console.error("Ошибка при авто-паузе:", e));
+          window.contract
+            .pauseRental()
+            .catch(e => console.error("Ошибка при авто-паузе:", e));
           setForcedPauseReason("zone");
           setRental(prevRental => ({ ...prevRental, isPaused: true }));
           updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
+        } else if (
+          dist2 <= geoZones.allowed.radius ** 2 &&
+          forcedPauseReason === "zone" &&
+          rental.isPaused &&
+          contractStatus === "Paused"
+        ) {
+          window.contract
+            .resumeRental()
+            .catch(e => console.error("Ошибка при авто-возобновлении:", e));
+          setForcedPauseReason(null);
+          setRental(prevRental => ({ ...prevRental, isPaused: false }));
+          updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
         }
 
         return { lat: newLat, lng: newLng };
