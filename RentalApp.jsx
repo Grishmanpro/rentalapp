@@ -237,14 +237,16 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     try {
       if (rental.isPaused) {
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
-        setRental(prev => ({ ...prev, isPaused: false }));
-        setContractStatus("Active");
         await tx.wait();
+        const status = await window.contract.getStatus();
+        setRental(prev => ({ ...prev, isPaused: false }));
+        setContractStatus(status);
       } else {
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
-        setRental(prev => ({ ...prev, isPaused: true }));
-        setContractStatus("Paused");
         await tx.wait();
+        const status = await window.contract.getStatus();
+        setRental(prev => ({ ...prev, isPaused: true }));
+        setContractStatus(status);
       }
 
       const rentalData = await window.contract.activeRental();
@@ -253,7 +255,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         isPaused: rentalData.isPaused,
         totalPausedDuration: Number(rentalData.pausedDuration)
       }));
-      
+
     } catch (error) {
       console.error("Ошибка паузы:", error);
       updateStatus(`❌ ${error.reason?.split(":")[1] || "Ошибка транзакции"}`);
