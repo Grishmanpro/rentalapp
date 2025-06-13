@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserProvider, Contract, parseEther, formatEther } from "ethers";
 import ABI from "../abi/RentalContractABI.json";
 
@@ -49,6 +49,9 @@ export default function RentalApp() {
   });
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
+
+  // Step counter for coordinate emulation
+  const simulationStepRef = useRef(0);
 
   const [contractStatus, setContractStatus] = useState("");
 
@@ -189,8 +192,21 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       // Эмуляция координат и проверка зоны
       setCoordinates(prev => {
-        const newLat = parseFloat((prev.lat + (Math.random() - 0.5) * 0.0001).toFixed(6));
-        const newLng = parseFloat((prev.lng + (Math.random() - 0.5) * 0.0001).toFixed(6));
+        simulationStepRef.current += 1;
+
+        let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * 0.0001).toFixed(6));
+        let newLng = parseFloat((prev.lng + (Math.random() - 0.5) * 0.0001).toFixed(6));
+
+        if (simulationStepRef.current === 5) {
+          // выходим из рабочей зоны
+          newLat = geoZones.restricted.lat;
+          newLng = geoZones.restricted.lng;
+        } else if (simulationStepRef.current === 10) {
+          // возвращаемся в рабочую зону
+          newLat = geoZones.allowed.lat;
+          newLng = geoZones.allowed.lng;
+          simulationStepRef.current = 0;
+        }
 
         const latE6 = Math.floor(newLat * 1e6);
         const lonE6 = Math.floor(newLng * 1e6);
