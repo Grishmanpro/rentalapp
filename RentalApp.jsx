@@ -234,9 +234,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   const resumeRentalAndRestart = async () => {
     try {
       const tx = await window.contract.resumeRental();
-      setRental(prev => ({ ...prev, isPaused: false }));
-      setContractStatus("Active");
       await tx.wait();
+      const rentalData = await window.contract.activeRental();
+      setRental(prev => ({
+        ...prev,
+        isPaused: rentalData.isPaused,
+        totalPausedDuration: Number(rentalData.pausedDuration)
+      }));
+      setContractStatus("Active");
       updateStatus("▶ Аренда возобновлена.");
     } catch (e) {
       console.error("Ошибка возобновления:", e);
@@ -251,22 +256,25 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     try {
       if (rental.isPaused) {
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
-        setRental(prev => ({ ...prev, isPaused: false }));
-        setContractStatus("Active");
         await tx.wait();
+        const rentalData = await window.contract.activeRental();
+        setRental(prev => ({
+          ...prev,
+          isPaused: rentalData.isPaused,
+          totalPausedDuration: Number(rentalData.pausedDuration)
+        }));
+        setContractStatus("Active");
       } else {
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
-        setRental(prev => ({ ...prev, isPaused: true }));
-        setContractStatus("Paused");
         await tx.wait();
+        const rentalData = await window.contract.activeRental();
+        setRental(prev => ({
+          ...prev,
+          isPaused: rentalData.isPaused,
+          totalPausedDuration: Number(rentalData.pausedDuration)
+        }));
+        setContractStatus("Paused");
       }
-
-      const rentalData = await window.contract.activeRental();
-      setRental(prev => ({
-        ...prev,
-        isPaused: rentalData.isPaused,
-        totalPausedDuration: Number(rentalData.pausedDuration)
-      }));
       
     } catch (error) {
       console.error("Ошибка паузы:", error);
