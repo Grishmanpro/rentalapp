@@ -507,17 +507,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 ////////////////////////////////////////
   return (
     <div className="min-h-screen flex bg-slate-50 text-gray-900 font-sans">
-      {/* Боковая панель */}
-      <aside className="w-60 bg-white border-r border-gray-200 p-6">
-        <h2 className="text-xl font-semibold mb-6">📦 Rental Panel</h2>
-        <nav className="space-y-2 text-sm">
-          <a href="#" className="block text-blue-600 font-medium">Dashboard</a>
-          <a href="#" className="block text-gray-600 hover:text-blue-500">Active Rentals</a>
-          <a href="#" className="block text-gray-600 hover:text-blue-500">History</a>
-        </nav>
-        <footer className="absolute bottom-6 left-6 text-xs text-gray-400">v1.0.0</footer>
-      </aside>
-
       {/* Основное содержимое */}
       <main className="flex-1 p-10">
         {/* Шапка */}
