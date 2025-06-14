@@ -202,20 +202,34 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           // keep the last position and skip random movement during any pause
           return prev;
         }
-        simulationStepRef.current += 1;
 
-        let newLat = parseFloat((prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
-        let newLng = parseFloat((prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6));
+        let newLat = prev.lat;
+        let newLng = prev.lng;
 
-        if (simulateViolation && simulationStepRef.current === 5) {
-          // выходим из рабочей зоны
-          newLat = geoZones.restricted.lat;
-          newLng = geoZones.restricted.lng;
-        } else if (simulateViolation && simulationStepRef.current === 10) {
-          // возвращаемся в рабочую зону
+        if (simulateViolation) {
+          simulationStepRef.current += 1;
+
+          newLat = parseFloat(
+            (prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6)
+          );
+          newLng = parseFloat(
+            (prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6)
+          );
+
+          if (simulationStepRef.current === 5) {
+            // выходим из рабочей зоны
+            newLat = geoZones.restricted.lat;
+            newLng = geoZones.restricted.lng;
+          } else if (simulationStepRef.current === 10) {
+            // возвращаемся в рабочую зону
+            newLat = geoZones.allowed.lat;
+            newLng = geoZones.allowed.lng;
+            simulationStepRef.current = 0;
+          }
+        } else {
+          // Держим координаты в центре разрешённой зоны
           newLat = geoZones.allowed.lat;
           newLng = geoZones.allowed.lng;
-          simulationStepRef.current = 0;
         }
 
         const latE6 = Math.floor(newLat * 1e6);
@@ -267,6 +281,13 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
     return () => clearInterval(interval);
   }, [rental.isActive, rental.isPaused, contractStatus, simulateViolation]);
+
+  // При выключенной симуляции держим координаты в центре рабочей зоны
+  useEffect(() => {
+    if (!simulateViolation) {
+      setCoordinates({ lat: geoZones.allowed.lat, lng: geoZones.allowed.lng });
+    }
+  }, [simulateViolation, geoZones.allowed.lat, geoZones.allowed.lng]);
 
   // Периодически обновляем статус контракта
   useEffect(() => {
