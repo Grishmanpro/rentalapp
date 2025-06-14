@@ -53,6 +53,8 @@ export default function RentalApp() {
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
 
+  const [chainTimer, setChainTimer] = useState(0);
+
   // Step counter for coordinate emulation
   const simulationStepRef = useRef(0);
 
@@ -114,6 +116,15 @@ export default function RentalApp() {
 
       const currentStatus = await fetchAdjustedStatus();
       setContractStatus(currentStatus);
+
+      if (currentStatus !== "Available") {
+        try {
+          const used = await contract.calculateUsedTime();
+          setChainTimer(Number(used));
+        } catch (e) {
+          console.error("Ошибка получения времени контракта:", e);
+        }
+      }
 
       // Подписываемся на события паузы/возобновления
       contract.on("RentalPaused", async () => {
@@ -310,6 +321,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     return () => clearInterval(id);
   }, [wallet.connected]);
 
+  // Получаем фактическое время из контракта
+  useEffect(() => {
+    if (!wallet.connected || rental.startTime === null) return;
+    const id = setInterval(() => {
+      window.contract
+        .calculateUsedTime()
+        .then(t => setChainTimer(Number(t)))
+        .catch(e => console.error("Ошибка получения времени контракта:", e));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [wallet.connected, rental.startTime]);
+
 
   // Обработчик паузы с интеграцией контракта
   const handlePause = async () => {
@@ -337,6 +360,12 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         isPaused: rentalData.isPaused,
         totalPausedDuration: Number(rentalData.pausedDuration)
       }));
+      try {
+        const used = await window.contract.calculateUsedTime();
+        setChainTimer(Number(used));
+      } catch (e) {
+        console.error("Ошибка получения времени контракта:", e);
+      }
 
     } catch (error) {
       console.error("Ошибка паузы:", error);
@@ -385,6 +414,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       await tx.wait();
       simulationStepRef.current = 0;
+      setChainTimer(0);
 
       setRental(prev => ({
         ...prev,
@@ -473,6 +503,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         isActive: false,
         startTime: null,
         timer: usedSeconds,
+
         status: `🔁 Аренда завершена. Возвращено: ${refundAmount} ETH`,
         endTxHash: tx.hash,
         report: {
@@ -482,6 +513,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           deposit: depositAmount
         }
       }));
+      setChainTimer(usedSeconds);
       setContractStatus("Available");
 
       // Обновляем баланс кошелька
@@ -499,6 +531,12 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       try {
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
+        try {
+          const used = await window.contract.calculateUsedTime();
+          setChainTimer(Number(used));
+        } catch (e) {
+          console.error("Ошибка получения времени контракта:", e);
+        }
         updateStatus(`📋 Статус: ${status}`);
     } catch (error) {
       console.error("Ошибка проверки статуса:", error);
@@ -688,6 +726,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                 Время аренды: {Math.min(rental.timer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
               </p>
               <p className="text-gray-600">
+                ⏱ По контракту: {chainTimer} сек
+              </p>
+              <p className="text-gray-600">
                 📍 Координаты: {coordinates.lat}, {coordinates.lng}
                 </p>
               <p className="text-gray-600">
@@ -744,6 +785,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             <div className="text-sm text-gray-700 pt-4 border-t">
               <p><strong>Чек аренды:</strong></p>
               <p>⏱ Время: {Math.min(rental.timer, rental.fixedDuration)} сек</p>
+              <p>⏱ По контракту: {chainTimer} сек</p>
               <p>💰 Сумма: {formatCurrency(currentCostEth)}</p>
               {rental.endTxHash && rental.report && (
                 <div className="pt-2 space-y-1">
