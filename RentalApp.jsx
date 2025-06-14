@@ -112,17 +112,19 @@ export default function RentalApp() {
       const contract = new Contract(CONTRACT_ADDRESS, ABI, signer);
       window.contract = contract;
 
-      const currentStatus = await contract.getStatus();
+      const currentStatus = await fetchAdjustedStatus();
       setContractStatus(currentStatus);
 
       // Подписываемся на события паузы/возобновления
-      contract.on("RentalPaused", () => {
+      contract.on("RentalPaused", async () => {
         setRental(prev => ({ ...prev, isPaused: true }));
-        setContractStatus("Paused");
+        const status = await fetchAdjustedStatus();
+        setContractStatus(status);
       });
-      contract.on("RentalResumed", () => {
+      contract.on("RentalResumed", async () => {
         setRental(prev => ({ ...prev, isPaused: false }));
-        setContractStatus("Active");
+        const status = await fetchAdjustedStatus();
+        setContractStatus(status);
       });
 
       const equipmentData = await Promise.all([
@@ -182,6 +184,16 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       console.error("Ошибка подключения:", error);
       updateStatus("Ошибка подключения");
     }
+  };
+
+
+  const fetchAdjustedStatus = async () => {
+    const data = await window.contract.activeRental();
+    if (!data.isActive) return "Available";
+    if (data.isPaused) return "Paused";
+    const used = await window.contract.calculateUsedTime();
+    const maxDur = Number(data.endTime) - Number(data.startTime);
+    return used >= maxDur ? "Overdue" : "Active";
   };
 
   // Отсчёт времени и геоконтроль
@@ -292,9 +304,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   // Периодически обновляем статус контракта
   useEffect(() => {
     if (!wallet.connected) return;
-    const id = setInterval(() => {
-      window.contract.getStatus().then(setContractStatus).catch(() => {});
-    }, 3000);
+      const id = setInterval(() => {
+        fetchAdjustedStatus().then(setContractStatus).catch(() => {});
+      }, 3000);
     return () => clearInterval(id);
   }, [wallet.connected]);
 
@@ -307,7 +319,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         setRental(prev => ({ ...prev, isPaused: false }));
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
         await tx.wait();
-        const status = await window.contract.getStatus();
+        const status = await fetchAdjustedStatus();
         setContractStatus(status);
         simulationStepRef.current = 0;
       } else {
@@ -315,7 +327,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         setRental(prev => ({ ...prev, isPaused: true }));
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
         await tx.wait();
-        const status = await window.contract.getStatus();
+        const status = await fetchAdjustedStatus();
         setContractStatus(status);
       }
 
@@ -484,10 +496,10 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
   // Проверка статуса
   const checkStatus = async () => {
-    try {
-      const status = await window.contract.getStatus();
-      setContractStatus(status);
-      updateStatus(`📋 Статус: ${status}`);
+      try {
+        const status = await fetchAdjustedStatus();
+        setContractStatus(status);
+        updateStatus(`📋 Статус: ${status}`);
     } catch (error) {
       console.error("Ошибка проверки статуса:", error);
       updateStatus("❌ Ошибка проверки статуса");
