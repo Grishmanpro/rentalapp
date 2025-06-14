@@ -5,7 +5,7 @@ import ABI from "../abi/RentalContractABI.json";
 const CONTRACT_ADDRESS = "0x43182Ae66569CE85C9aB8Aa45b94A66743EcCa88";
 const ETH_TO_RUB_RATE = 270000;
 const GAS_BUFFER_ETH = 0.0003;
-const ETHERSCAN_BASE = "https://sepolia.etherscan.io/tx/";
+let ETHERSCAN_BASE = "";
 const provider = new BrowserProvider(window.ethereum);
 // Amplitude of random coordinate shift in degrees (~0.0005 deg ≈ 55 m)
 const COORDINATE_NOISE = 0.001;
@@ -109,6 +109,19 @@ export default function RentalApp() {
       const accounts = await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       const network = await provider.getNetwork();
+      switch (network.chainId) {
+        case 1:
+          ETHERSCAN_BASE = "https://etherscan.io/tx/";
+          break;
+        case 5:
+          ETHERSCAN_BASE = "https://goerli.etherscan.io/tx/";
+          break;
+        case 11155111:
+          ETHERSCAN_BASE = "https://sepolia.etherscan.io/tx/";
+          break;
+        default:
+          ETHERSCAN_BASE = `https://${network.name}.etherscan.io/tx/`;
+      }
       const balance = await provider.getBalance(accounts[0]);
       
       const contract = new Contract(CONTRACT_ADDRESS, ABI, signer);
