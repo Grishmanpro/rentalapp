@@ -47,7 +47,8 @@ export default function RentalApp() {
     pausedTime: 0,
     totalPausedDuration: 0,
     startTxHash: null,
-    endTxHash: null
+    endTxHash: null,
+    report: null
   });
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
@@ -361,7 +362,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         totalPausedDuration: 0,
         status: "✅ Аренда началась",
         startTxHash: tx.hash,
-        endTxHash: null
+        endTxHash: null,
+        report: null
       }));
       setContractStatus("Active");
   
@@ -426,16 +428,26 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         return;
       }
 
-      const usedSeconds = event.args.usedSeconds.toString();
+      const usedSeconds = parseInt(event.args.usedSeconds.toString());
+      const amountPaid = formatEther(event.args.amountPaid.toString());
       const refundAmount = formatEther(event.args.refundAmount.toString());
+      const depositAmount = (
+        parseFloat(amountPaid) + parseFloat(refundAmount)
+      ).toFixed(6);
 
       setRental(prev => ({
         ...prev,
         isActive: false,
         startTime: null,
-        timer: 0,
+        timer: usedSeconds,
         status: `🔁 Аренда завершена. Возвращено: ${refundAmount} ETH`,
-        endTxHash: tx.hash
+        endTxHash: tx.hash,
+        report: {
+          usedSeconds,
+          amountPaid,
+          refundAmount,
+          deposit: depositAmount
+        }
       }));
       setContractStatus("Available");
 
@@ -706,11 +718,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
               <p><strong>Чек аренды:</strong></p>
               <p>⏱ Время: {Math.min(rental.timer, rental.fixedDuration)} сек</p>
               <p>💰 Сумма: {formatCurrency(currentCostEth)}</p>
-              {rental.endTxHash && (
-                <div className="pt-2">
-                  <p><strong>Отчёт:</strong></p>
+              {rental.endTxHash && rental.report && (
+                <div className="pt-2 space-y-1">
+                  <p><strong>Отчёт о сделке:</strong></p>
                   <p>
-                    Начало: {" "}
+                    Начало:{" "}
                     <a
                       href={`${ETHERSCAN_BASE}${rental.startTxHash}`}
                       target="_blank"
@@ -721,7 +733,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                     </a>
                   </p>
                   <p>
-                    Завершение: {" "}
+                    Завершение:{" "}
                     <a
                       href={`${ETHERSCAN_BASE}${rental.endTxHash}`}
                       target="_blank"
@@ -731,6 +743,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                       посмотреть
                     </a>
                   </p>
+                  <p>Депозит: {formatCurrency(rental.report.deposit, true)} ({formatCurrency(rental.report.deposit)})</p>
+                  <p>Удержано: {formatCurrency(rental.report.amountPaid, true)} ({formatCurrency(rental.report.amountPaid)})</p>
+                  <p>Возврат: {formatCurrency(rental.report.refundAmount, true)} ({formatCurrency(rental.report.refundAmount)})</p>
                 </div>
               )}
             </div>
