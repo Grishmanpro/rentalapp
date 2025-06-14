@@ -692,7 +692,12 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             <div className="pt-2 flex gap-2 flex-wrap">
             <button
                 onClick={handlePause}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm shadow"
+                disabled={forcedPauseReason === "zone"}
+                className={`px-4 py-2 rounded-md text-sm shadow text-white ${
+                  forcedPauseReason === "zone"
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-yellow-500 hover:bg-yellow-600"
+                }`}
                 >
                 {rental.isPaused ? "▶ Продолжить" : "⏸ Пауза"}
                 </button>
