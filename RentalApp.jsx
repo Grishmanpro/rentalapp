@@ -7,8 +7,9 @@ const ETH_TO_RUB_RATE = 270000;
 const GAS_BUFFER_ETH = 0.0003;
 let ETHERSCAN_BASE = "";
 const provider = new BrowserProvider(window.ethereum);
-// Amplitude of random coordinate shift in degrees (~0.0005 deg ≈ 55 m)
-const COORDINATE_NOISE = 0.001;
+// Amplitude of random coordinate shift in degrees (~0.00025 deg ≈ 28 m)
+// Smaller value reduces chance of immediately crossing the allowed zone
+const COORDINATE_NOISE = 0.0005;
 
 const formatCurrency = (value, isEth = false) => {
   if (isEth) {
