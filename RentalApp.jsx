@@ -228,12 +228,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     if (!rental.isActive) return;
 
     const interval = setInterval(async () => {
-      // Увеличиваем таймер только когда контракт активен и аренда не на паузе
-      setRental(prev =>
-        prev.isPaused || contractStatus !== "Active"
-          ? prev
-          : { ...prev, timer: prev.timer + 1 }
-      );
 
       let dist2 = 0;
       // Эмуляция координат и вычисление расстояния
@@ -347,13 +341,10 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         }
       }
 
-      // Автозавершение аренды
-      setRental(prev => {
-        if (prev.fixedDuration && prev.timer >= prev.fixedDuration) {
-          return { ...prev, isActive: false };
-        }
-        return prev;
-      });
+      // Автозавершение аренды на основе времени в контракте
+      if (rental.fixedDuration && chainTimer >= rental.fixedDuration) {
+        setRental(prev => ({ ...prev, isActive: false }));
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -398,7 +389,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     const id = setInterval(() => {
       window.contract
         .calculateUsedTime()
-        .then(t => setChainTimer(Number(t)))
+        .then(t => {
+          const used = Number(t);
+          setChainTimer(used);
+          setRental(prev => ({ ...prev, timer: used }));
+        })
         .catch(e => console.error("Ошибка получения времени контракта:", e));
     }, 1000);
     return () => clearInterval(id);
@@ -481,7 +476,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       await tx.wait();
       simulationStepRef.current = 0;
-      setChainTimer(0);
+      const used = await window.contract.calculateUsedTime();
+      setChainTimer(Number(used));
 
       setRental(prev => ({
         ...prev,
@@ -613,12 +609,12 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
   // Расчет текущей стоимости
   const currentCostEth = parseFloat(equipment.pricePerSecond) * Math.min(
-    rental.timer, 
+    chainTimer,
     rental.fixedDuration || 0
   );
-  
-  const progressPercent = rental.fixedDuration 
-    ? Math.min((rental.timer / rental.fixedDuration) * 100, 100) 
+
+  const progressPercent = rental.fixedDuration
+    ? Math.min((chainTimer / rental.fixedDuration) * 100, 100)
     : 0;
     
 ////////////////////////////////////////
@@ -790,7 +786,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             )}
             <div className="space-y-1">
               <p className="text-gray-700 font-medium">
-                Время аренды: {Math.min(rental.timer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
+                Время аренды: {Math.min(chainTimer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
               </p>
               <p className="text-gray-600">
                 ⏱ По контракту: {chainTimer} сек
@@ -851,7 +847,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             </div>
             <div className="text-sm text-gray-700 pt-4 border-t">
               <p><strong>Чек аренды:</strong></p>
-              <p>⏱ Время: {Math.min(rental.timer, rental.fixedDuration)} сек</p>
+              <p>⏱ Время: {Math.min(chainTimer, rental.fixedDuration)} сек</p>
               <p>⏱ По контракту: {chainTimer} сек</p>
               <p>💰 Сумма: {formatCurrency(currentCostEth)}</p>
               {rental.endTxHash && rental.report && (
