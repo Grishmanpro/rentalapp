@@ -273,12 +273,6 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             newLng = geoZones.allowed.lng;
             simulationStepRef.current = 0;
           }
-        } else {
-          // Держим координаты в центре разрешённой зоны
-          newLat = geoZones.allowed.lat;
-          newLng = geoZones.allowed.lng;
-        }
-
         const latE6 = Math.floor(newLat * 1e6);
         const lonE6 = Math.floor(newLng * 1e6);
         const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
@@ -365,12 +359,29 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     return () => clearInterval(interval);
   }, [rental.isActive, rental.isPaused, contractStatus, simulateViolation, forcedPauseReason]);
 
-  // При выключенной симуляции держим координаты в центре рабочей зоны
+
+  // Включаем отслеживание GPS, когда аренда активна
   useEffect(() => {
-    if (!simulateViolation && contractStatus === "Active") {
-      setCoordinates({ lat: geoZones.allowed.lat, lng: geoZones.allowed.lng });
+    if (!rental.isActive) return;
+
+    let watchId;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          setCoordinates({
+            lat: parseFloat(pos.coords.latitude.toFixed(6)),
+            lng: parseFloat(pos.coords.longitude.toFixed(6))
+          });
+        },
+        err => console.error("Geolocation error:", err),
+        { enableHighAccuracy: true }
+      );
     }
-  }, [simulateViolation, geoZones.allowed.lat, geoZones.allowed.lng, contractStatus]);
+
+    return () => {
+      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [rental.isActive]);
 
   // Периодически обновляем статус контракта
   useEffect(() => {
