@@ -416,13 +416,16 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       }
   
       updateStatus("⏳ Подписание транзакции...");
-      const totalCost = parseFloat(equipment.pricePerSecond) * parseInt(rental.duration);
-  
+      const totalCost =
+        parseFloat(equipment.pricePerSecond) * parseInt(rental.duration);
+
+      // toString() may produce scientific notation for small values which
+      // parseEther cannot parse. Force a fixed-point representation.
       const tx = await window.contract.rent(
         parseInt(rental.duration),
         latE6,
         lonE6,
-        { value: parseEther(totalCost.toString()) }
+        { value: parseEther(totalCost.toFixed(18)) }
       );
 
       await tx.wait();
