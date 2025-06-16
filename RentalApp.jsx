@@ -58,6 +58,8 @@ export default function RentalApp() {
 
   // Step counter for coordinate emulation
   const simulationStepRef = useRef(0);
+  // Flag to avoid overlapping geofence transactions
+  const geofenceTxRef = useRef(false);
 
   const [contractStatus, setContractStatus] = useState("");
 
@@ -225,7 +227,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   useEffect(() => {
     if (!rental.isActive || rental.isPaused || contractStatus !== "Active") return;
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       // Увеличиваем таймер только когда контракт активен и аренда не на паузе
       setRental(prev =>
         prev.isPaused || contractStatus !== "Active"
@@ -233,10 +235,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           : { ...prev, timer: prev.timer + 1 }
       );
 
-      // Эмуляция координат и проверка зоны
+      let dist2 = 0;
+      // Эмуляция координат и вычисление расстояния
       setCoordinates(prev => {
         if (rental.isPaused || forcedPauseReason === "zone" || contractStatus !== "Active") {
-          // keep the last position and skip random movement during any pause
+          const latE6 = Math.floor(prev.lat * 1e6);
+          const lonE6 = Math.floor(prev.lng * 1e6);
+          const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
+          const centerLonE6 = Math.floor(geoZones.allowed.lng * 1e6);
+
+          const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
+          const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
+          dist2 = metersLat ** 2 + metersLon ** 2;
           return prev;
         }
 
@@ -276,36 +286,72 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
         const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
         const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
-        const dist2 = metersLat ** 2 + metersLon ** 2;
+        dist2 = metersLat ** 2 + metersLon ** 2;
 
+        return { lat: newLat, lng: newLng };
+      });
+
+      if (!geofenceTxRef.current) {
         if (
           dist2 > geoZones.allowed.radius ** 2 &&
           contractStatus === "Active" &&
           !forcedPauseReason
         ) {
-          window.contract
-            .pauseRental()
-            .catch(e => console.error("Ошибка при авто-паузе:", e));
-          setForcedPauseReason("zone");
-          setRental(prevRental => ({ ...prevRental, isPaused: true }));
-          updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
+          geofenceTxRef.current = true;
+          try {
+            updateStatus("⏳ Пауза... оплата продолжается до подтверждения");
+            const tx = await window.contract.pauseRental({ gasLimit: 250000 });
+            await tx.wait();
+            const status = await fetchAdjustedStatus();
+            setContractStatus(status);
+            const rentalData = await window.contract.activeRental();
+            const used = await window.contract.calculateUsedTime();
+            setChainTimer(Number(used));
+            setRental(prevRental => ({
+              ...prevRental,
+              isPaused: rentalData.isPaused,
+              totalPausedDuration: Number(rentalData.pausedDuration),
+              timer: Number(used)
+            }));
+            setForcedPauseReason("zone");
+            updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
+          } catch (e) {
+            console.error("Ошибка при авто-паузе:", e);
+          } finally {
+            geofenceTxRef.current = false;
+          }
         } else if (
           dist2 <= geoZones.allowed.radius ** 2 &&
           forcedPauseReason === "zone" &&
           rental.isPaused &&
           contractStatus === "Paused"
         ) {
-          window.contract
-            .resumeRental()
-            .catch(e => console.error("Ошибка при авто-возобновлении:", e));
-          setForcedPauseReason(null);
-          simulationStepRef.current = 0;
-          setRental(prevRental => ({ ...prevRental, isPaused: false }));
-          updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
+          geofenceTxRef.current = true;
+          try {
+            updateStatus("⏳ Возобновление... оплата продолжается до подтверждения");
+            const tx = await window.contract.resumeRental({ gasLimit: 250000 });
+            await tx.wait();
+            const status = await fetchAdjustedStatus();
+            setContractStatus(status);
+            const rentalData = await window.contract.activeRental();
+            const used = await window.contract.calculateUsedTime();
+            setChainTimer(Number(used));
+            setRental(prevRental => ({
+              ...prevRental,
+              isPaused: rentalData.isPaused,
+              totalPausedDuration: Number(rentalData.pausedDuration),
+              timer: Number(used)
+            }));
+            simulationStepRef.current = 0;
+            setForcedPauseReason(null);
+            updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
+          } catch (e) {
+            console.error("Ошибка при авто-возобновлении:", e);
+          } finally {
+            geofenceTxRef.current = false;
+          }
         }
-
-        return { lat: newLat, lng: newLng };
-      });
+      }
 
       // Автозавершение аренды
       setRental(prev => {
