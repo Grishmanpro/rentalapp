@@ -16,7 +16,7 @@ const formatCurrency = (value, isEth = false) => {
     return parseFloat(value).toFixed(6) + " ETH";
   }
   const rubValue = parseFloat(value) * ETH_TO_RUB_RATE;
-  return rubValue.toFixed(2).replace('.', ',') + " ₽";
+  return rubValue.toFixed(2).replace(".", ",") + " ₽";
 };
 
 export default function RentalApp() {
@@ -24,7 +24,7 @@ export default function RentalApp() {
     connected: false,
     address: "",
     network: "",
-    balance: "0"
+    balance: "0",
   });
 
   const [equipment, setEquipment] = useState({
@@ -34,7 +34,7 @@ export default function RentalApp() {
     isReturnable: false,
     lessor: "",
     isAvailable: true,
-    currentDeposit: "0"
+    currentDeposit: "0",
   });
 
   const [rental, setRental] = useState({
@@ -49,7 +49,7 @@ export default function RentalApp() {
     totalPausedDuration: 0,
     startTxHash: null,
     endTxHash: null,
-    report: null
+    report: null,
   });
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
@@ -63,30 +63,29 @@ export default function RentalApp() {
 
   const [contractStatus, setContractStatus] = useState("");
 
-
   const [calculation, setCalculation] = useState({
     estimatedCostEth: null,
     estimatedCostRub: null,
-    canAfford: true
+    canAfford: true,
   });
 
   const [coordinates, setCoordinates] = useState({ lat: 55.75, lng: 37.61 });
 
   const [geoZones, setGeoZones] = useState({
     allowed: {
-      lat: 55.750000,
-      lng: 37.610000,
-      radius: 100 // в метрах
+      lat: 55.75,
+      lng: 37.61,
+      radius: 100, // в метрах
     },
     restricted: {
       lat: 0,
       lng: 0,
-      radius: 100
-    }
+      radius: 100,
+    },
   });
 
   const [simulateViolation, setSimulateViolation] = useState(false);
-  
+
   const generateRestrictedZone = (allowedZone) => {
     const offsetMeters = allowedZone.radius + 50; // немного дальше рабочей зоны
     const offsetDegrees = offsetMeters / 111000;
@@ -94,11 +93,9 @@ export default function RentalApp() {
     return {
       lat: allowedZone.lat + offsetDegrees,
       lng: allowedZone.lng + offsetDegrees,
-      radius: 200
+      radius: 200,
     };
   };
-  
-
 
   // Подключение кошелька и загрузка данных
   const connectWallet = async () => {
@@ -108,7 +105,6 @@ export default function RentalApp() {
     }
 
     try {
-      
       const accounts = await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       const network = await provider.getNetwork();
@@ -126,7 +122,7 @@ export default function RentalApp() {
           ETHERSCAN_BASE = `https://${network.name}.etherscan.io/tx/`;
       }
       const balance = await provider.getBalance(accounts[0]);
-      
+
       const contract = new Contract(CONTRACT_ADDRESS, ABI, signer);
       window.contract = contract;
 
@@ -144,12 +140,12 @@ export default function RentalApp() {
 
       // Подписываемся на события паузы/возобновления
       contract.on("RentalPaused", async () => {
-        setRental(prev => ({ ...prev, isPaused: true }));
+        setRental((prev) => ({ ...prev, isPaused: true }));
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
       });
       contract.on("RentalResumed", async () => {
-        setRental(prev => ({ ...prev, isPaused: false }));
+        setRental((prev) => ({ ...prev, isPaused: false }));
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
       });
@@ -159,41 +155,41 @@ export default function RentalApp() {
         contract.pricePerSecond(),
         contract.minDeposit(),
         contract.isReturnable(),
-        contract.lessor()
+        contract.lessor(),
       ]);
 
       const geoData = await Promise.all([
         contract.centerLat(),
         contract.centerLon(),
-        contract.radius()
+        contract.radius(),
       ]);
-      
+
       const allowedLat = Number(geoData[0]) / 1e6;
       const allowedLng = Number(geoData[1]) / 1e6;
       const allowedRadius = Number(geoData[2]);
 
-      setGeoZones(prev => ({
+      setGeoZones((prev) => ({
         ...prev,
         allowed: {
           lat: allowedLat,
           lng: allowedLng,
-          radius: allowedRadius
+          radius: allowedRadius,
         },
         restricted: generateRestrictedZone({
           lat: allowedLat,
           lng: allowedLng,
-          radius: allowedRadius
-        })
+          radius: allowedRadius,
+        }),
       }));
 
-// Устанавливаем начальные координаты точно в центр рабочей зоны
-setCoordinates({ lat: allowedLat, lng: allowedLng });
+      // Устанавливаем начальные координаты точно в центр рабочей зоны
+      setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       setWallet({
         connected: true,
         address: accounts[0],
         network: network.name,
-        balance: formatEther(balance)
+        balance: formatEther(balance),
       });
 
       setEquipment({
@@ -202,17 +198,15 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         pricePerSecond: formatEther(equipmentData[1]),
         minDeposit: formatEther(equipmentData[2]),
         isReturnable: equipmentData[3],
-        lessor: equipmentData[4]
+        lessor: equipmentData[4],
       });
 
       updateStatus("Кошелёк подключен");
-
     } catch (error) {
       console.error("Ошибка подключения:", error);
       updateStatus("Ошибка подключения");
     }
   };
-
 
   const fetchAdjustedStatus = async () => {
     const data = await window.contract.activeRental();
@@ -228,18 +222,21 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     if (!rental.isActive) return;
 
     const interval = setInterval(async () => {
-
       let dist2 = 0;
       // Эмуляция координат и вычисление расстояния
-      setCoordinates(prev => {
-        if (rental.isPaused || forcedPauseReason === "zone" || contractStatus !== "Active") {
+      setCoordinates((prev) => {
+        if (
+          rental.isPaused ||
+          forcedPauseReason === "zone" ||
+          contractStatus !== "Active"
+        ) {
           const latE6 = Math.floor(prev.lat * 1e6);
           const lonE6 = Math.floor(prev.lng * 1e6);
           const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
           const centerLonE6 = Math.floor(geoZones.allowed.lng * 1e6);
 
-          const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
-          const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
+          const metersLat = (Math.abs(latE6 - centerLatE6) * 111000) / 1e6;
+          const metersLon = (Math.abs(lonE6 - centerLonE6) * 111000) / 1e6;
           dist2 = metersLat ** 2 + metersLon ** 2;
           return prev;
         }
@@ -251,10 +248,10 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           simulationStepRef.current += 1;
 
           newLat = parseFloat(
-            (prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6)
+            (prev.lat + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6),
           );
           newLng = parseFloat(
-            (prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6)
+            (prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6),
           );
 
           if (simulationStepRef.current === 5) {
@@ -267,13 +264,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             newLng = geoZones.allowed.lng;
             simulationStepRef.current = 0;
           }
+        }
         const latE6 = Math.floor(newLat * 1e6);
         const lonE6 = Math.floor(newLng * 1e6);
         const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
         const centerLonE6 = Math.floor(geoZones.allowed.lng * 1e6);
 
-        const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
-        const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
+        const metersLat = (Math.abs(latE6 - centerLatE6) * 111000) / 1e6;
+        const metersLon = (Math.abs(lonE6 - centerLonE6) * 111000) / 1e6;
         dist2 = metersLat ** 2 + metersLon ** 2;
 
         return { lat: newLat, lng: newLng };
@@ -295,11 +293,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             const rentalData = await window.contract.activeRental();
             const used = await window.contract.calculateUsedTime();
             setChainTimer(Number(used));
-            setRental(prevRental => ({
+            setRental((prevRental) => ({
               ...prevRental,
               isPaused: rentalData.isPaused,
               totalPausedDuration: Number(rentalData.pausedDuration),
-              timer: Number(used)
+              timer: Number(used),
             }));
             setForcedPauseReason("zone");
             updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
@@ -316,7 +314,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         ) {
           geofenceTxRef.current = true;
           try {
-            updateStatus("⏳ Возобновление... оплата продолжается до подтверждения");
+            updateStatus(
+              "⏳ Возобновление... оплата продолжается до подтверждения",
+            );
             const tx = await window.contract.resumeRental({ gasLimit: 250000 });
             await tx.wait();
             const status = await fetchAdjustedStatus();
@@ -324,15 +324,17 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             const rentalData = await window.contract.activeRental();
             const used = await window.contract.calculateUsedTime();
             setChainTimer(Number(used));
-            setRental(prevRental => ({
+            setRental((prevRental) => ({
               ...prevRental,
               isPaused: rentalData.isPaused,
               totalPausedDuration: Number(rentalData.pausedDuration),
-              timer: Number(used)
+              timer: Number(used),
             }));
             simulationStepRef.current = 0;
             setForcedPauseReason(null);
-            updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
+            updateStatus(
+              "✅ Техника вернулась в рабочую зону. Работа продолжена.",
+            );
           } catch (e) {
             console.error("Ошибка при авто-возобновлении:", e);
           } finally {
@@ -343,13 +345,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       // Автозавершение аренды на основе времени в контракте
       if (rental.fixedDuration && chainTimer >= rental.fixedDuration) {
-        setRental(prev => ({ ...prev, isActive: false }));
+        setRental((prev) => ({ ...prev, isActive: false }));
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [rental.isActive, rental.isPaused, contractStatus, simulateViolation, forcedPauseReason]);
-
+  }, [
+    rental.isActive,
+    rental.isPaused,
+    contractStatus,
+    simulateViolation,
+    forcedPauseReason,
+  ]);
 
   // Включаем отслеживание GPS, когда аренда активна
   useEffect(() => {
@@ -358,14 +365,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     let watchId;
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
-        pos => {
+        (pos) => {
           setCoordinates({
             lat: parseFloat(pos.coords.latitude.toFixed(6)),
-            lng: parseFloat(pos.coords.longitude.toFixed(6))
+            lng: parseFloat(pos.coords.longitude.toFixed(6)),
           });
         },
-        err => console.error("Geolocation error:", err),
-        { enableHighAccuracy: true }
+        (err) => console.error("Geolocation error:", err),
+        { enableHighAccuracy: true },
       );
     }
 
@@ -377,9 +384,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   // Периодически обновляем статус контракта
   useEffect(() => {
     if (!wallet.connected) return;
-      const id = setInterval(() => {
-        fetchAdjustedStatus().then(setContractStatus).catch(() => {});
-      }, 3000);
+    const id = setInterval(() => {
+      fetchAdjustedStatus()
+        .then(setContractStatus)
+        .catch(() => {});
+    }, 3000);
     return () => clearInterval(id);
   }, [wallet.connected]);
 
@@ -389,22 +398,23 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     const id = setInterval(() => {
       window.contract
         .calculateUsedTime()
-        .then(t => {
+        .then((t) => {
           const used = Number(t);
           setChainTimer(used);
-          setRental(prev => ({ ...prev, timer: used }));
+          setRental((prev) => ({ ...prev, timer: used }));
         })
-        .catch(e => console.error("Ошибка получения времени контракта:", e));
+        .catch((e) => console.error("Ошибка получения времени контракта:", e));
     }, 1000);
     return () => clearInterval(id);
   }, [wallet.connected, rental.startTime]);
-
 
   // Обработчик паузы с интеграцией контракта
   const handlePause = async () => {
     try {
       if (rental.isPaused) {
-        updateStatus("⏳ Возобновление... оплата продолжается до подтверждения");
+        updateStatus(
+          "⏳ Возобновление... оплата продолжается до подтверждения",
+        );
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
         await tx.wait();
         const status = await fetchAdjustedStatus();
@@ -421,13 +431,12 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       const rentalData = await window.contract.activeRental();
       const used = await window.contract.calculateUsedTime();
       setChainTimer(Number(used));
-      setRental(prev => ({
+      setRental((prev) => ({
         ...prev,
         isPaused: rentalData.isPaused,
         totalPausedDuration: Number(rentalData.pausedDuration),
-        timer: Number(used)
+        timer: Number(used),
       }));
-
     } catch (error) {
       console.error("Ошибка паузы:", error);
       updateStatus(`❌ ${error.reason?.split(":")[1] || "Ошибка транзакции"}`);
@@ -435,7 +444,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   };
 
   const updateStatus = (message) => {
-    setRental(prev => ({ ...prev, status: message }));
+    setRental((prev) => ({ ...prev, status: message }));
   };
 
   // Начало аренды
@@ -444,23 +453,25 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       updateStatus("Введите корректную длительность");
       return;
     }
-  
+
     try {
       const latE6 = Math.floor(coordinates.lat * 1e6);
       const lonE6 = Math.floor(coordinates.lng * 1e6);
-  
+
       const centerLatE6 = Math.floor(geoZones.allowed.lat * 1e6);
       const centerLonE6 = Math.floor(geoZones.allowed.lng * 1e6);
-  
-      const metersLat = Math.abs(latE6 - centerLatE6) * 111000 / 1e6;
-      const metersLon = Math.abs(lonE6 - centerLonE6) * 111000 / 1e6;
+
+      const metersLat = (Math.abs(latE6 - centerLatE6) * 111000) / 1e6;
+      const metersLon = (Math.abs(lonE6 - centerLonE6) * 111000) / 1e6;
       const distance2 = metersLat ** 2 + metersLon ** 2;
-  
+
       if (distance2 > geoZones.allowed.radius ** 2) {
-        updateStatus("⛔ Вы находитесь вне рабочей зоны. Переместитесь в зону перед арендой.");
+        updateStatus(
+          "⛔ Вы находитесь вне рабочей зоны. Переместитесь в зону перед арендой.",
+        );
         return;
       }
-  
+
       updateStatus("⏳ Подписание транзакции...");
       const totalCost =
         parseFloat(equipment.pricePerSecond) * parseInt(rental.duration);
@@ -471,7 +482,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         parseInt(rental.duration),
         latE6,
         lonE6,
-        { value: parseEther(totalCost.toFixed(18)) }
+        { value: parseEther(totalCost.toFixed(18)) },
       );
 
       await tx.wait();
@@ -479,7 +490,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       const used = await window.contract.calculateUsedTime();
       setChainTimer(Number(used));
 
-      setRental(prev => ({
+      setRental((prev) => ({
         ...prev,
         startTime: Math.floor(Date.now() / 1000),
         fixedDuration: parseInt(rental.duration),
@@ -489,17 +500,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         status: "✅ Аренда началась",
         startTxHash: tx.hash,
         endTxHash: null,
-        report: null
+        report: null,
       }));
       setContractStatus("Active");
-  
     } catch (error) {
       console.error("Ошибка аренды:", error);
       updateStatus(`❌ Ошибка при аренде: ${error.reason || error.message}`);
     }
   };
-  
-  
 
   // Расчет стоимости
   const calculateEstimate = () => {
@@ -515,23 +523,21 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     setCalculation({
       estimatedCostEth: ethValue.toFixed(6),
       estimatedCostRub: formatCurrency(ethValue),
-      canAfford: parseFloat(wallet.balance) >= (ethValue + GAS_BUFFER_ETH)
+      canAfford: parseFloat(wallet.balance) >= ethValue + GAS_BUFFER_ETH,
     });
 
     updateStatus("✅ Стоимость рассчитана");
   };
 
-
- 
-   // Обновлённый метод возврата оборудования
-   const returnEquipment = async () => {
+  // Обновлённый метод возврата оборудования
+  const returnEquipment = async () => {
     try {
       updateStatus("⏳ Завершение аренды...");
       const tx = await window.contract.returnEquipment({ gasLimit: 300000 });
       const receipt = await tx.wait();
-      
+
       // Получаем актуальные данные из контракта
-      let event = receipt.events?.find(e => e.event === "RentalEnded");
+      let event = receipt.events?.find((e) => e.event === "RentalEnded");
 
       // Fallback для сетей без receipt.events
       if (!event) {
@@ -561,7 +567,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         parseFloat(amountPaid) + parseFloat(refundAmount)
       ).toFixed(6);
 
-      setRental(prev => ({
+      setRental((prev) => ({
         ...prev,
         isActive: false,
         startTime: null,
@@ -573,34 +579,35 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           usedSeconds,
           amountPaid,
           refundAmount,
-          deposit: depositAmount
-        }
+          deposit: depositAmount,
+        },
       }));
       setChainTimer(usedSeconds);
       setContractStatus("Available");
 
       // Обновляем баланс кошелька
       const newBalance = await provider.getBalance(wallet.address);
-      setWallet(prev => ({ ...prev, balance: formatEther(newBalance) }));
-
+      setWallet((prev) => ({ ...prev, balance: formatEther(newBalance) }));
     } catch (error) {
       console.error("Ошибка возврата:", error);
-      updateStatus(`❌ Ошибка: ${error.reason?.split(":")[1] || error.message}`);
+      updateStatus(
+        `❌ Ошибка: ${error.reason?.split(":")[1] || error.message}`,
+      );
     }
   };
 
   // Проверка статуса
   const checkStatus = async () => {
+    try {
+      const status = await fetchAdjustedStatus();
+      setContractStatus(status);
       try {
-        const status = await fetchAdjustedStatus();
-        setContractStatus(status);
-        try {
-          const used = await window.contract.calculateUsedTime();
-          setChainTimer(Number(used));
-        } catch (e) {
-          console.error("Ошибка получения времени контракта:", e);
-        }
-        updateStatus(`📋 Статус: ${status}`);
+        const used = await window.contract.calculateUsedTime();
+        setChainTimer(Number(used));
+      } catch (e) {
+        console.error("Ошибка получения времени контракта:", e);
+      }
+      updateStatus(`📋 Статус: ${status}`);
     } catch (error) {
       console.error("Ошибка проверки статуса:", error);
       updateStatus("❌ Ошибка проверки статуса");
@@ -608,16 +615,15 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   };
 
   // Расчет текущей стоимости
-  const currentCostEth = parseFloat(equipment.pricePerSecond) * Math.min(
-    chainTimer,
-    rental.fixedDuration || 0
-  );
+  const currentCostEth =
+    parseFloat(equipment.pricePerSecond) *
+    Math.min(chainTimer, rental.fixedDuration || 0);
 
   const progressPercent = rental.fixedDuration
     ? Math.min((chainTimer / rental.fixedDuration) * 100, 100)
     : 0;
-    
-////////////////////////////////////////
+
+  ////////////////////////////////////////
   return (
     <div className="min-h-screen flex bg-slate-50 text-gray-900 font-sans">
       {/* Основное содержимое */}
@@ -626,9 +632,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Аренда спецтехники</h1>
           {contractStatus && (
-            <span className="text-sm text-gray-600">Статус: {contractStatus}</span>
+            <span className="text-sm text-gray-600">
+              Статус: {contractStatus}
+            </span>
           )}
-          
+
           {!wallet.connected ? (
             <button
               onClick={connectWallet}
@@ -638,7 +646,9 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             </button>
           ) : (
             <div className="flex items-center bg-gray-100 border border-gray-200 px-4 py-2 rounded-md text-xs text-gray-600 font-mono space-x-2">
-              <span>🟢 {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}</span>
+              <span>
+                🟢 {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+              </span>
               <span className="text-gray-500">({wallet.network})</span>
               <button
                 onClick={() => {
@@ -646,7 +656,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                     connected: false,
                     address: "",
                     network: "",
-                    balance: "0"
+                    balance: "0",
                   });
                   updateStatus("Отключено");
                 }}
@@ -660,37 +670,52 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
         {/* Информация об оборудовании */}
         <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl mb-6">
-          <h2 className="text-xl font-semibold mb-2 text-gray-800">Информация о технике</h2>
+          <h2 className="text-xl font-semibold mb-2 text-gray-800">
+            Информация о технике
+          </h2>
           <ul className="text-sm text-gray-700 space-y-1">
-            <li><strong>Название:</strong> {equipment.name || "—"}</li>
             <li>
-              <strong>Цена за секунду:</strong> {formatCurrency(equipment.pricePerSecond, true)} (
+              <strong>Название:</strong> {equipment.name || "—"}
+            </li>
+            <li>
+              <strong>Цена за секунду:</strong>{" "}
+              {formatCurrency(equipment.pricePerSecond, true)} (
               {formatCurrency(equipment.pricePerSecond)})
             </li>
             <li>
-              <strong>Минимальный депозит:</strong> {formatCurrency(equipment.minDeposit, true)} (
+              <strong>Минимальный депозит:</strong>{" "}
+              {formatCurrency(equipment.minDeposit, true)} (
               {formatCurrency(equipment.minDeposit)})
             </li>
-            <li><strong>Досрочный возврат:</strong> {equipment.isReturnable ? "Да" : "Нет"}</li>
+            <li>
+              <strong>Досрочный возврат:</strong>{" "}
+              {equipment.isReturnable ? "Да" : "Нет"}
+            </li>
             <li>
               <strong>Арендодатель:</strong>{" "}
               <span className="font-mono">
                 {equipment.lessor?.slice(0, 6)}...{equipment.lessor?.slice(-4)}
               </span>
-              {wallet.address.toLowerCase() === equipment.lessor.toLowerCase() && (
-                <span className="ml-2 text-xs text-green-500 font-medium">(Вы)</span>
+              {wallet.address.toLowerCase() ===
+                equipment.lessor.toLowerCase() && (
+                <span className="ml-2 text-xs text-green-500 font-medium">
+                  (Вы)
+                </span>
               )}
-                <li>
-                  <strong>Рабочая геозона:</strong><br />
-                  Центр: {geoZones.allowed.lat}, {geoZones.allowed.lng}<br />
-                  Радиус: {geoZones.allowed.radius} м
-                </li>
-                <li>
-                  <strong>Запретная зона:</strong><br />
-                  Центр: {geoZones.restricted.lat}, {geoZones.restricted.lng}<br />
-                  Радиус: {geoZones.restricted.radius} м
-                </li>
-
+              <li>
+                <strong>Рабочая геозона:</strong>
+                <br />
+                Центр: {geoZones.allowed.lat}, {geoZones.allowed.lng}
+                <br />
+                Радиус: {geoZones.allowed.radius} м
+              </li>
+              <li>
+                <strong>Запретная зона:</strong>
+                <br />
+                Центр: {geoZones.restricted.lat}, {geoZones.restricted.lng}
+                <br />
+                Радиус: {geoZones.restricted.radius} м
+              </li>
               <strong>Статус контракта:</strong>{" "}
               <span className="font-medium">{contractStatus || "—"}</span>
             </li>
@@ -701,13 +726,15 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl space-y-6">
           <div className="grid gap-4">
             <label className="text-sm">Длительность аренды (в секундах)</label>
-          <input
-            type="number"
-            value={rental.duration}
-            onChange={(e) => setRental(prev => ({...prev, duration: e.target.value}))}
-            placeholder="например, 3600"
-            className="w-full border border-gray-300 px-4 py-2 rounded-md shadow-sm text-sm"
-          />
+            <input
+              type="number"
+              value={rental.duration}
+              onChange={(e) =>
+                setRental((prev) => ({ ...prev, duration: e.target.value }))
+              }
+              placeholder="например, 3600"
+              className="w-full border border-gray-300 px-4 py-2 rounded-md shadow-sm text-sm"
+            />
           </div>
 
           <label className="flex items-center gap-2 text-sm">
@@ -721,7 +748,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           </label>
 
           <div className="text-sm text-gray-600">
-            💰 Баланс: {formatCurrency(wallet.balance, true)} ({formatCurrency(wallet.balance)})
+            💰 Баланс: {formatCurrency(wallet.balance, true)} (
+            {formatCurrency(wallet.balance)})
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -730,8 +758,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
               disabled={!equipment.isAvailable || !calculation.canAfford}
               className={`py-2 rounded-md shadow-sm text-white ${
                 equipment.isAvailable
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-gray-400 cursor-not-allowed"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-gray-400 cursor-not-allowed"
               }`}
             >
               Арендовать
@@ -756,28 +784,40 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
           {calculation.estimatedCostEth && (
             <div className="text-sm text-gray-800 pt-2 border-t">
-              💰 Ориентировочная стоимость: {formatCurrency(calculation.estimatedCostEth)} (
+              💰 Ориентировочная стоимость:{" "}
+              {formatCurrency(calculation.estimatedCostEth)} (
               {calculation.estimatedCostEth} ETH)
               <div className="text-sm text-gray-600 pt-2 flex items-center gap-2">
-                Прогноз: {calculation.canAfford ? (
-                  <span className="text-green-600 font-medium">✔ Достаточно средств</span>
+                Прогноз:{" "}
+                {calculation.canAfford ? (
+                  <span className="text-green-600 font-medium">
+                    ✔ Достаточно средств
+                  </span>
                 ) : (
-                  <span className="text-red-600 font-medium">❌ Недостаточно средств</span>
+                  <span className="text-red-600 font-medium">
+                    ❌ Недостаточно средств
+                  </span>
                 )}
-                <span className="text-xs text-gray-400">(включая {GAS_BUFFER_ETH} ETH на gas)</span>
+                <span className="text-xs text-gray-400">
+                  (включая {GAS_BUFFER_ETH} ETH на gas)
+                </span>
               </div>
             </div>
           )}
 
           {rental.status && (
-            <div className="text-sm text-blue-700 pt-4 border-t">{rental.status}</div>
+            <div className="text-sm text-blue-700 pt-4 border-t">
+              {rental.status}
+            </div>
           )}
         </div>
 
         {/* Отслеживание аренды */}
         {rental.startTime !== null && (
           <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl mt-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">⏱ Отслеживание аренды</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              ⏱ Отслеживание аренды
+            </h2>
             <p className="text-sm text-gray-600">Статус: {contractStatus}</p>
             {forcedPauseReason === "zone" && (
               <div className="bg-red-100 border border-red-300 text-red-800 p-2 rounded text-sm">
@@ -786,14 +826,13 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             )}
             <div className="space-y-1">
               <p className="text-gray-700 font-medium">
-                Время аренды: {Math.min(chainTimer, rental.fixedDuration)} сек / {rental.fixedDuration} сек
+                Время аренды: {Math.min(chainTimer, rental.fixedDuration)} сек /{" "}
+                {rental.fixedDuration} сек
               </p>
-              <p className="text-gray-600">
-                ⏱ По контракту: {chainTimer} сек
-              </p>
+              <p className="text-gray-600">⏱ По контракту: {chainTimer} сек</p>
               <p className="text-gray-600">
                 📍 Координаты: {coordinates.lat}, {coordinates.lng}
-                </p>
+              </p>
               <p className="text-gray-600">
                 💸 Стоимость: {formatCurrency(currentCostEth)} (
                 {currentCostEth.toFixed(6)} ETH)
@@ -806,7 +845,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
               </div>
             </div>
             <div className="pt-2 flex gap-2 flex-wrap">
-            <button
+              <button
                 onClick={handlePause}
                 disabled={forcedPauseReason === "zone"}
                 className={`px-4 py-2 rounded-md text-sm shadow text-white ${
@@ -814,45 +853,45 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-yellow-500 hover:bg-yellow-600"
                 }`}
-                >
+              >
                 {rental.isPaused ? "▶ Продолжить" : "⏸ Пауза"}
+              </button>
+
+              {forcedPauseReason === "zone" && (
+                <button
+                  onClick={() => {
+                    setCoordinates({
+                      lat: geoZones.allowed.lat,
+                      lng: geoZones.allowed.lng,
+                    });
+                    setForcedPauseReason(null);
+                    updateStatus("🔄 Координаты возвращены в рабочую зону.");
+                  }}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm shadow"
+                >
+                  ⬅ Вернуться в зону
                 </button>
+              )}
 
-
-
-                  {forcedPauseReason === "zone" && (
-                    <button
-                      onClick={() => {
-                        setCoordinates({
-                          lat: geoZones.allowed.lat,
-                          lng: geoZones.allowed.lng
-                        });
-                        setForcedPauseReason(null);
-                        updateStatus("🔄 Координаты возвращены в рабочую зону.");
-                      }}
-                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm shadow"
-                    >
-                      ⬅ Вернуться в зону
-                    </button>
-                  )}
-
-
-                    <button
-                      onClick={returnEquipment}
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm shadow"
-                    >
-                      ⛔ Завершить
-                    </button>
-
+              <button
+                onClick={returnEquipment}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm shadow"
+              >
+                ⛔ Завершить
+              </button>
             </div>
             <div className="text-sm text-gray-700 pt-4 border-t">
-              <p><strong>Чек аренды:</strong></p>
+              <p>
+                <strong>Чек аренды:</strong>
+              </p>
               <p>⏱ Время: {Math.min(chainTimer, rental.fixedDuration)} сек</p>
               <p>⏱ По контракту: {chainTimer} сек</p>
               <p>💰 Сумма: {formatCurrency(currentCostEth)}</p>
               {rental.endTxHash && rental.report && (
                 <div className="pt-2 space-y-1">
-                  <p><strong>Отчёт о сделке:</strong></p>
+                  <p>
+                    <strong>Отчёт о сделке:</strong>
+                  </p>
                   <p>
                     Начало:{" "}
                     <a
@@ -875,9 +914,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
                       посмотреть
                     </a>
                   </p>
-                  <p>Депозит: {formatCurrency(rental.report.deposit, true)} ({formatCurrency(rental.report.deposit)})</p>
-                  <p>Удержано: {formatCurrency(rental.report.amountPaid, true)} ({formatCurrency(rental.report.amountPaid)})</p>
-                  <p>Возврат: {formatCurrency(rental.report.refundAmount, true)} ({formatCurrency(rental.report.refundAmount)})</p>
+                  <p>
+                    Депозит: {formatCurrency(rental.report.deposit, true)} (
+                    {formatCurrency(rental.report.deposit)})
+                  </p>
+                  <p>
+                    Удержано: {formatCurrency(rental.report.amountPaid, true)} (
+                    {formatCurrency(rental.report.amountPaid)})
+                  </p>
+                  <p>
+                    Возврат: {formatCurrency(rental.report.refundAmount, true)}{" "}
+                    ({formatCurrency(rental.report.refundAmount)})
+                  </p>
                 </div>
               )}
             </div>
