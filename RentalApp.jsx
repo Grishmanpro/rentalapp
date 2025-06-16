@@ -352,16 +352,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   const handlePause = async () => {
     try {
       if (rental.isPaused) {
-        // Останавливаем таймер сразу при возобновлении
-        setRental(prev => ({ ...prev, isPaused: false }));
+        updateStatus("⏳ Возобновление... оплата продолжается до подтверждения");
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
         await tx.wait();
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
         simulationStepRef.current = 0;
       } else {
-        // Останавливаем таймер сразу при паузе
-        setRental(prev => ({ ...prev, isPaused: true }));
+        updateStatus("⏳ Пауза... оплата продолжается до подтверждения");
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
         await tx.wait();
         const status = await fetchAdjustedStatus();
@@ -369,22 +367,17 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
       }
 
       const rentalData = await window.contract.activeRental();
+      const used = await window.contract.calculateUsedTime();
+      setChainTimer(Number(used));
       setRental(prev => ({
         ...prev,
         isPaused: rentalData.isPaused,
-        totalPausedDuration: Number(rentalData.pausedDuration)
+        totalPausedDuration: Number(rentalData.pausedDuration),
+        timer: Number(used)
       }));
-      try {
-        const used = await window.contract.calculateUsedTime();
-        setChainTimer(Number(used));
-      } catch (e) {
-        console.error("Ошибка получения времени контракта:", e);
-      }
 
     } catch (error) {
       console.error("Ошибка паузы:", error);
-      // Возвращаем предыдущее состояние если транзакция не прошла
-      setRental(prev => ({ ...prev, isPaused: !prev.isPaused }));
       updateStatus(`❌ ${error.reason?.split(":")[1] || "Ошибка транзакции"}`);
     }
   };
