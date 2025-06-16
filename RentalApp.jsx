@@ -222,7 +222,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
   // Отсчёт времени и геоконтроль
   useEffect(() => {
-    if (!rental.isActive || rental.isPaused) return;
+    if (!rental.isActive || rental.isPaused || contractStatus !== "Active") return;
 
     const interval = setInterval(() => {
       // Увеличиваем таймер только когда контракт активен и аренда не на паузе
@@ -234,7 +234,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
       // Эмуляция координат и проверка зоны
       setCoordinates(prev => {
-        if (rental.isPaused || forcedPauseReason === "zone") {
+        if (rental.isPaused || forcedPauseReason === "zone" || contractStatus !== "Active") {
           // keep the last position and skip random movement during any pause
           return prev;
         }
@@ -320,10 +320,10 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
   // При выключенной симуляции держим координаты в центре рабочей зоны
   useEffect(() => {
-    if (!simulateViolation) {
+    if (!simulateViolation && contractStatus === "Active") {
       setCoordinates({ lat: geoZones.allowed.lat, lng: geoZones.allowed.lng });
     }
-  }, [simulateViolation, geoZones.allowed.lat, geoZones.allowed.lng]);
+  }, [simulateViolation, geoZones.allowed.lat, geoZones.allowed.lng, contractStatus]);
 
   // Периодически обновляем статус контракта
   useEffect(() => {
