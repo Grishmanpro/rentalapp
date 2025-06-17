@@ -9,6 +9,10 @@ let ETHERSCAN_BASE = "";
 const provider = new BrowserProvider(window.ethereum);
 // Amplitude of random coordinate shift in degrees (~0.0005 deg ≈ 55 m)
 const COORDINATE_NOISE = 0.001;
+// Step when emulation leaves allowed zone. Change to control violation timing
+const VIOLATION_STEP = 10;
+// Step when emulation returns to allowed zone
+const RETURN_STEP = VIOLATION_STEP + 5;
 
 const formatCurrency = (value, isEth = false) => {
   if (isEth) {
@@ -253,11 +257,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             (prev.lng + (Math.random() - 0.5) * COORDINATE_NOISE).toFixed(6)
           );
 
-          if (simulationStepRef.current === 15) {
+          if (simulationStepRef.current === VIOLATION_STEP) {
             // выходим из рабочей зоны
             newLat = geoZones.restricted.lat;
             newLng = geoZones.restricted.lng;
-          } else if (simulationStepRef.current === 20) {
+          } else if (simulationStepRef.current === RETURN_STEP) {
             // возвращаемся в рабочую зону
             newLat = geoZones.allowed.lat;
             newLng = geoZones.allowed.lng;
