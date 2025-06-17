@@ -285,7 +285,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
         if (
           dist2 > geoZones.allowed.radius ** 2 &&
           contractStatus === "Active" &&
-          !forcedPauseReason
+          !forcedPauseReason &&
+          !rental.pausePending // avoid duplicate pause calls
         ) {
           setRental(prevRental => ({ ...prevRental, pausePending: true }));
           window.contract
@@ -302,7 +303,8 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           dist2 <= geoZones.allowed.radius ** 2 &&
           forcedPauseReason === "zone" &&
           rental.isPaused &&
-          contractStatus === "Paused"
+          contractStatus === "Paused" &&
+          !rental.pausePending // avoid duplicate resume calls
         ) {
           setRental(prevRental => ({ ...prevRental, pausePending: true }));
           window.contract
@@ -329,7 +331,14 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [rental.isActive, rental.isPaused, contractStatus, simulateViolation]);
+  }, [
+    rental.isActive,
+    rental.isPaused,
+    contractStatus,
+    simulateViolation,
+    forcedPauseReason, // ensure interval reacts to zone pause changes
+    rental.pausePending
+  ]);
 
   // При выключенной симуляции держим координаты в центре рабочей зоны
   useEffect(() => {
