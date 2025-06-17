@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { BrowserProvider, Contract, parseEther, formatEther } from "ethers";
 import ABI from "../abi/RentalContractABI.json";
 
-const CONTRACT_ADDRESS = "0xEbD6F85cd7De5e515a426CEE9F92F6Be4c045BAd ";
+const CONTRACT_ADDRESS = "0xBB763F3cfC2a33383e619bD0158A7E549eC4b3de";
 const ETH_TO_RUB_RATE = 270000;
 const GAS_BUFFER_ETH = 0.0003;
 let ETHERSCAN_BASE = "";
