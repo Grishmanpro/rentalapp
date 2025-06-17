@@ -48,7 +48,8 @@ export default function RentalApp() {
     totalPausedDuration: 0,
     startTxHash: null,
     endTxHash: null,
-    report: null
+    report: null,
+    pausePending: false
   });
 
   const [forcedPauseReason, setForcedPauseReason] = useState(null); // null | "zone"
@@ -141,12 +142,12 @@ export default function RentalApp() {
 
       // Подписываемся на события паузы/возобновления
       contract.on("RentalPaused", async () => {
-        setRental(prev => ({ ...prev, isPaused: true }));
+        setRental(prev => ({ ...prev, isPaused: true, pausePending: false }));
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
       });
       contract.on("RentalResumed", async () => {
-        setRental(prev => ({ ...prev, isPaused: false }));
+        setRental(prev => ({ ...prev, isPaused: false, pausePending: false }));
         const status = await fetchAdjustedStatus();
         setContractStatus(status);
       });
@@ -282,25 +283,33 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           contractStatus === "Active" &&
           !forcedPauseReason
         ) {
+          setRental(prevRental => ({ ...prevRental, pausePending: true }));
           window.contract
             .pauseRental()
-            .catch(e => console.error("Ошибка при авто-паузе:", e));
+            .catch(e => {
+              console.error("Ошибка при авто-паузе:", e);
+              setRental(prevRental => ({ ...prevRental, pausePending: false }));
+            });
           setForcedPauseReason("zone");
-          setRental(prevRental => ({ ...prevRental, isPaused: true }));
-          updateStatus("⚠️ Работа приостановлена. Вы покинули рабочую зону.");
+          updateStatus(
+            "⚠️ Вы покинули рабочую зону. Ожидание подтверждения паузы..."
+          );
         } else if (
           dist2 <= geoZones.allowed.radius ** 2 &&
           forcedPauseReason === "zone" &&
           rental.isPaused &&
           contractStatus === "Paused"
         ) {
+          setRental(prevRental => ({ ...prevRental, pausePending: true }));
           window.contract
             .resumeRental()
-            .catch(e => console.error("Ошибка при авто-возобновлении:", e));
+            .catch(e => {
+              console.error("Ошибка при авто-возобновлении:", e);
+              setRental(prevRental => ({ ...prevRental, pausePending: false }));
+            });
           setForcedPauseReason(null);
           simulationStepRef.current = 0;
-          setRental(prevRental => ({ ...prevRental, isPaused: false }));
-          updateStatus("✅ Техника вернулась в рабочую зону. Работа продолжена.");
+          updateStatus("✅ Техника вернулась в рабочую зону. Возобновляем работу...");
         }
 
         return { lat: newLat, lng: newLng };
@@ -350,29 +359,29 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
   // Обработчик паузы с интеграцией контракта
   const handlePause = async () => {
     try {
+      setRental(prev => ({ ...prev, pausePending: true }));
       if (rental.isPaused) {
-        // Останавливаем таймер сразу при возобновлении
-        setRental(prev => ({ ...prev, isPaused: false }));
+        updateStatus("⏳ Подтверждение возобновления...");
         const tx = await window.contract.resumeRental({ gasLimit: 250000 });
         await tx.wait();
-        const status = await fetchAdjustedStatus();
-        setContractStatus(status);
         simulationStepRef.current = 0;
       } else {
-        // Останавливаем таймер сразу при паузе
-        setRental(prev => ({ ...prev, isPaused: true }));
+        updateStatus("⏳ Подтверждение паузы...");
         const tx = await window.contract.pauseRental({ gasLimit: 250000 });
         await tx.wait();
-        const status = await fetchAdjustedStatus();
-        setContractStatus(status);
       }
+
+      const status = await fetchAdjustedStatus();
+      setContractStatus(status);
 
       const rentalData = await window.contract.activeRental();
       setRental(prev => ({
         ...prev,
         isPaused: rentalData.isPaused,
-        totalPausedDuration: Number(rentalData.pausedDuration)
+        totalPausedDuration: Number(rentalData.pausedDuration),
+        pausePending: false
       }));
+
       try {
         const used = await window.contract.calculateUsedTime();
         setChainTimer(Number(used));
@@ -382,8 +391,7 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
 
     } catch (error) {
       console.error("Ошибка паузы:", error);
-      // Возвращаем предыдущее состояние если транзакция не прошла
-      setRental(prev => ({ ...prev, isPaused: !prev.isPaused }));
+      setRental(prev => ({ ...prev, pausePending: false }));
       updateStatus(`❌ ${error.reason?.split(":")[1] || "Ошибка транзакции"}`);
     }
   };
@@ -729,6 +737,11 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
           <div className="bg-white rounded-xl shadow border border-gray-200 p-6 max-w-2xl mt-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">⏱ Отслеживание аренды</h2>
             <p className="text-sm text-gray-600">Статус: {contractStatus}</p>
+            {rental.pausePending && (
+              <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-2 rounded text-sm">
+                ⏳ Транзакция выполняется. Счётчик продолжает идти
+              </div>
+            )}
             {forcedPauseReason === "zone" && (
               <div className="bg-red-100 border border-red-300 text-red-800 p-2 rounded text-sm">
                 Техника находится вне геозоны
@@ -758,14 +771,18 @@ setCoordinates({ lat: allowedLat, lng: allowedLng });
             <div className="pt-2 flex gap-2 flex-wrap">
             <button
                 onClick={handlePause}
-                disabled={forcedPauseReason === "zone"}
+                disabled={forcedPauseReason === "zone" || rental.pausePending}
                 className={`px-4 py-2 rounded-md text-sm shadow text-white ${
-                  forcedPauseReason === "zone"
+                  forcedPauseReason === "zone" || rental.pausePending
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-yellow-500 hover:bg-yellow-600"
                 }`}
                 >
-                {rental.isPaused ? "▶ Продолжить" : "⏸ Пауза"}
+                {rental.pausePending
+                  ? "..."
+                  : rental.isPaused
+                  ? "▶ Продолжить"
+                  : "⏸ Пауза"}
                 </button>
 
 
